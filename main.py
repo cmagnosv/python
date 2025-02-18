@@ -14,8 +14,8 @@ dados_conceitos ={
 cores_map = dict(
     Java='red',
     Python='green',
-    sql='yellow',
-    Golang='blue',
+    Sql='yellow',
+    GoLang='blue',
     JavaScript='pink'
 )
 
@@ -24,22 +24,23 @@ app.layout = html.Div([
 html.H4('Sebrae Maranhão',style={'textAlign':'center'}),
 html.Div(dcc.Dropdown(
     id="dropdown_linguagens",
-    options=[{'label':'Java','value':'Java'},
-             {'label':'Python','value':'Python'},
-             {'label':'SQL','value':'Sql'},
-             {'label':'GoLang','value':'GoLang'},
-             {'label':'JavaScript','value':'JavaScript'}
-    ],
+    options=[
+            {'label':'Java','value':'Java'},
+            {'label':'Python','value':'Python'},
+            {'label':'SQL','value':'Sql'},
+            {'label':'GoLang','value':'GoLang'},
+            {'label':'JavaScript','value':'JavaScript'}
+            ],
     value=['Java'],
     multi=True,
-    style={'width':'50%', 'margin':'0 auto'}
-    )), dcc.Graph(id='grafico_linguagem')
-], style={'width':'80%','margin':'0 auto'}
+    style={'width':'50%', 'margin':'0 auto'})), 
+    dcc.Graph(id='grafico_linguagem')],
+    style={'width':'80%','margin':'0 auto'}
 )
 
 @app.callback(
     Output('grafico_linguagem','figure'),
-    [Input('dropdown_inguagens','value')]
+    [Input('dropdown_linguagens','value')]
 )
 
 def scarter_linguagens(linguagens_selecionadas):
@@ -49,26 +50,28 @@ def scarter_linguagens(linguagens_selecionadas):
         for conceito,conhecimento in dados_linguagem.items():
             scarter_trace.append(
                 go.Scatter(
-                x =[conceito],
-                y= [conhecimento],
-                mode='markers',
-                name=linguagem.title(),
-                marker={'size':15,'color':cores_map[linguagem]},
-                showLegend=False
+                    x=[conceito],
+                    y=[conhecimento],
+                    mode='markers',
+                    name=linguagem.title(),
+                    marker={'size':15 , 'color':cores_map[linguagem]},
+                    showlegend=False
+                    
+                )
             )
 
-        )
-
-    scarter_layout = go.layout(
+    scartter_layout  = go.Layout(
         title = "Meus Conhecimentos em Linguagens",
         xaxis=dict(title='conceitos', showgrid=False),
         yaxis=dict(title='Nivel de Conhecimento', showgrid=False)
 
     )
-    return {'data':scarter_trace,'layout':scarter_layout}
+
+    return {'data':scarter_trace,'layout':scartter_layout }
 
 
 
 
 if __name__ =='__main__':
     app.run_server(debug=True)
+
