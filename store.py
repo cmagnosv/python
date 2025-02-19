@@ -6,24 +6,29 @@ import dash_bootstrap_components as dbc
 from dash_bootstrap_templates import ThemeSwitchAIO
 from dash.dependencies import Input, Output
 from dash import html, dcc, Input, Output
+import os
 
-daerk_theme = 'darkly'
+os.chdir(os.path.dirname(__file__))
+
+
+dark_theme = 'darkly'
 vapor_theme = 'vapor'
 url_dark_theme = dbc.themes.DARKLY
 url_vapor_theme = dbc.themes.VAPOR
 
 df = pd.read_csv('dataset_comp.csv')
-df['dt_Venda'] = pd.todatetime(df['dt_Venda'])
+df['dt_Venda'] = pd.to_datetime(df['dt_Venda'])
 df['Mes'] = df['dt_Venda'].dt.strftime('%b').str.upper()
 
 lista_clientes = []
+
 for cliente in df['Cliente'].unique():
-    lista_cliente.append({
+    lista_clientes.append({
         'label':cliente,
         'value':cliente
     })
 
-lista_cliente.append({
+lista_clientes.append({
     'label': 'Todos os Clientes',
     'value': 'todos_clientes'
 })
@@ -118,16 +123,18 @@ layout_linha01 = html.Div([
         'width':'65%',
         'text-align':'center'}
     ),
+    
+   
     html.Div([
         dbc.Checklist(
             id='radio_mes',
             options=lista_meses,
-            inLine=True
+            inline=True
         ),
         dbc.RadioItems(
             id='radio_categorias',
             options=lista_categorias,
-            inLine=True
+            inline=True
         )
     ], style={
         'width': '30%',
@@ -151,15 +158,16 @@ layout_linha02 = html.Div([
         'width': '60%',
         'text-algin': 'center'
         }),
-    html.Div([
-        dcc.Graph(id='visual03')
-    ], , style={'width': '30%'}, style={
+    
+    html.Div(dcc.Graph(id='visual03'),style={'width': '30%'})
+    ], style={
         'display': 'flex',
         'justify-content': 'space-around',
         'margin-top':'40px',
         'height': '150px'
     })
-])
+
+
 
 app.layout= html.Div([
     layout_titulo,
@@ -170,14 +178,14 @@ app.layout= html.Div([
 #---funções de apoio-#
 def filtro_cliente(cliente_selecionado):
     if cliente_selecionado is None:
-        return pd.series(True,index=df.index)
+        return pd.Series(True,index=df.index)
     return df['Cliente'] == cliente_selecionado
 
 def filtro_categoria(categoria_selecionada):
     if categoria_selecionada is None:
-        return pd,series(True, index=df.index)
+        return pd.Series(True, index=df.index)
     elif categoria_selecionada == 'todas_categorias':
-        return pd,series(True, index=df.index)
+        return pd.Series(True, index=df.index)
     return df['Categorias'] == categoria_selecionada
 
 def filtro_mes(meses_selecionados):
@@ -213,10 +221,180 @@ def atualizar_texto(cliente_selecionado, categoria_selecionada):
         Input('dropdown_cliente','value'),
         Input('radio_mes','value'),
         Input('radio_categorias','value'),
-        Input(ThemeSwitchAIO.ids,switch('theme'),'value')
+        Input(ThemeSwitchAIO.ids.switch('theme'),'value')
               
     ]
 )
 
-if __name__ == '__main__':
-    app.run.server(debug=True)
+def visual01(cliente, mes, categoria,toggle):
+    template = dark_theme if toggle else vapor_theme
+    nome_cliente = filtro_cliente(cliente)
+    nome_categoria = filtro_categoria(categoria)
+    nome_mes = filtro_mes(mes)
+    
+    cliente_mes_categoria = nome_cliente & nome_categoria & nome_mes
+    df_filtrado = df.loc[cliente_mes_categoria]
+    df_grupo = df_filtrado.groupby(['Produto','Categorias'])['Total Vendas'].sum().reset_index()
+    df_top5 = df_grupo.sort_values(by='Total Vendas', ascending=False).head(5)
+    
+    #criando o grafico
+    
+    fig = px.bar(
+        df_top5,
+        x='Produto',
+        y='Total Vendas',
+        color='Total Vendas',
+        text='Total Vendas',
+        color_continuous_scale='blues',
+        height=280,
+        template=template
+    )
+    fig.update_traces(texttemplate='%{text:.2s}', textposition='outside')
+    fig.update_layout(
+        margin=dict(t=0),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=False, range=[
+            df_top5['Total Vendas'].min() * 0,
+            df_top5['Total Vendas'].max() * 1.2
+        ]),
+        xaxis_title= None,
+        yaxis_title = None,
+        xaxis_tickangle = -15,
+        font = dict(size=15),
+        plot_bgcolor = 'rgba(0,0,0,0)',
+        paper_bgcolor = 'rgba(0,0,0,0)'
+    )
+    return fig
+
+@app.callback(
+    [
+        Output('visual02','figure'),
+        Output('visual03','figure')
+    ],
+    [
+        Input('radio_mes','value'),
+        Input('radio_categorias','value'),
+        Input(ThemeSwitchAIO.ids.switch('theme'),'value')
+    ]
+)
+
+def visual02_03(mes, categoria, toggle):
+
+    # definindo o tema que foi escolhido
+    
+    template = vapor_theme if toggle else dark_theme
+
+    # filtrando apenas por mes
+    
+    nome_mes = filtro_mes(mes)
+    nome_categoria = filtro_categoria(categoria)
+
+    # combinando os filtros
+    mes_categoria = nome_mes & nome_categoria
+    
+    # filtrando o dataframe
+    
+    df2 = df.loc[nome_categoria]
+    df3 = df.loc[mes_categoria]
+
+    # gerando análise de dados
+    
+    df_vendasMesLoja2 = df2.groupby(['Mes', 'Loja'])['Total Vendas'].sum().reset_index()
+    df_vendasMesLoja3 = df3.groupby(['Mes', 'Loja'])['Total Vendas'].sum().reset_index()
+
+    # normalizar o tamanho das bolhas
+    
+    max_size = df_vendasMesLoja2['Total Vendas'].max()
+    min_size = df_vendasMesLoja2['Total Vendas'].min()
+
+    # definir as cores para cada loja
+    cores_lojas = {
+        'Rio de Janeiro' : 'green',
+        'Salvador'       : 'yellow',
+        'Santos'         : 'purple',
+        'São Paulo'      : 'gray',
+        'Três Rios'      : 'blue',
+    }
+
+    # definir a ordem dos meses
+    
+    ordem_mes = [
+        'JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 
+        'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'
+    ]    
+
+
+    # criar o gráfico visual02
+    
+    fig2 = go.Figure()
+
+    for loja in df_vendasMesLoja2['Loja'].unique():
+        df_loja = df_vendasMesLoja2[df_vendasMesLoja2['Loja'] == loja]
+        cor = cores_lojas.get(loja, 'black')
+
+        fig2.add_trace(
+            go.Scatter(
+                x = df_loja['Mes'],
+                y =  df_loja['Total Vendas'],
+                mode= 'markers',
+                marker= dict(
+                    color = cor,
+                    size =  (df_loja['Total Vendas'] - min_size) / 
+                            (max_size - min_size) * 50, 
+                    opacity=0.5,
+                    line=dict(color=cor, width=0)
+                ),
+                name=str(loja)
+            )
+        )
+
+    fig2.update_layout(
+        margin=dict(t=0),
+        template=template,
+        plot_bgcolor = 'rgba(0,0,0,0)',
+        paper_bgcolor = 'rgba(0,0,0,0)',
+        xaxis=dict(
+            categoryorder='array',
+            categoryarray=ordem_mes,
+            showgrid=False
+        ),
+        yaxis=dict(showgrid=False)  
+    )
+
+
+    # criando visual03
+    
+    fig3 = go.Figure(data=go.Scatterpolar(
+        r = df_vendasMesLoja3['Total Vendas'],
+        theta= df_vendasMesLoja3['Loja'],
+        fill='toself',
+        line=dict(color='rgb(31, 119, 180)'),
+        marker=dict(color='rgb(31, 119, 180)', size=8),
+        opacity=0.7
+    ))
+
+    fig3.update_layout(
+        template=template,
+        polar= dict(
+            radialaxis=dict(
+                visible=True,
+                tickfont=dict(size=10),
+                tickangle=0,
+                tickcolor='rgba(68,68,68,0)',
+                ticklen= 5,
+                tickwidth=1,
+                tickprefix='',
+                ticksuffix='',
+                range=[0, max(df_vendasMesLoja3['Total Vendas']) + 1000]
+            )
+        ),
+        font=dict(family='Fira Code', size=12),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=40, r=40, t=80, b=40)
+    )
+
+    return fig2, fig3
+
+if __name__ =='__main__':
+    app.run_server(debug=True)
